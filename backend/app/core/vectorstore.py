@@ -5,9 +5,6 @@ from app.config import settings
 _embeddings = None
 
 def get_embeddings() -> OpenAIEmbeddings:
-    print('***************************')
-    print('***************************')
-    print(settings.openai_api_key)
     global _embeddings
     if _embeddings is None:
         _embeddings = OpenAIEmbeddings(
