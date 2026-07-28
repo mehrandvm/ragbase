@@ -180,3 +180,33 @@ This project was built as a hands-on Applied AI engineering exercise. Key concep
 ## License
 
 MIT
+
+## DEBUG COMMANDS
+
+```
+python -c "from app.config import settings; print(settings)"
+
+python -c "
+from app.core.vectorstore import get_vectorstore
+store = get_vectorstore('test-kb')
+print(store._collection.count(), 'docs in collection')
+"
+
+python -c "
+from app.core.ingestion import ingest
+count = ingest('./sample.pdf', kb_id='test-kb', file_name='sample.pdf')
+print(f'Stored {count} chunks')
+"
+
+python -c "
+from app.core.vectorstore import get_vectorstore
+store = get_vectorstore('test-kb')
+print(store._collection.count(), 'docs stored')
+results = store.similarity_search('tell me anything', k=2)
+for r in results:
+    print('---')
+    print(r.metadata)
+    print(r.page_content[:200])
+"
+```
+
