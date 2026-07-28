@@ -1,4 +1,3 @@
-# backend/app/api/routes/kb.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -44,10 +43,3 @@ def delete(kb_id: str):
 
     # remove from registry
     delete_kb(kb_id)
-
-
-# Three endpoints — create, list, delete.
-# Delete does two things in order: wipes the Chroma collection (vectors on disk),
-# then removes the entry from the JSON registry. Order matters — if registry deletion
-# ran first and Chroma deletion failed you'd have orphaned vectors with no pointer.
-# get_one exists mainly for the frontend to validate a kb_id before rendering the chat page.

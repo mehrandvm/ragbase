@@ -1,4 +1,3 @@
-# backend/app/api/routes/query.py
 import json
 from typing import AsyncGenerator
 
@@ -40,12 +39,3 @@ async def query(kb_id: str, body: QueryRequest):
             "X-Accel-Buffering": "no",   # disables nginx buffering if behind a proxy
         },
     )
-
-
-# Streams the LangGraph pipeline as Server-Sent Events (SSE).
-# The generator yields two types of chunks — plain text tokens and a final
-# [CITATIONS] JSON payload. The frontend reads the stream line by line,
-# checks the prefix, and routes accordingly: tokens go into the chat bubble,
-# citations go into the sources panel.
-# X-Accel-Buffering: no is critical if this ever runs behind nginx — without it
-# nginx buffers the entire response and streaming breaks silently.

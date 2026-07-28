@@ -1,4 +1,3 @@
-# backend/app/api/routes/ingest.py
 import os
 from pathlib import Path
 
@@ -50,10 +49,3 @@ async def ingest_file(kb_id: str, file: UploadFile = File(...)):
         "file_name":     file.filename,
         "chunks_stored": chunks_stored,
     }
-
-
-# Accepts a multipart file upload, validates extension, saves to a temp folder,
-# hands the path to the ingestion pipeline, then returns the chunk count.
-# ingestion.py deletes the temp file itself after embedding — no cleanup needed here
-# on the happy path. The try/except handles the edge case where ingestion crashes
-# before reaching its own cleanup.

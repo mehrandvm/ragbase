@@ -13,3 +13,5 @@ unstructured==0.17.2
 tiktoken==0.9.0
 python-dotenv==1.1.0
 pydantic-settings==2.9.1
+sentence-transformers==3.4.1
+langchain-huggingface==0.1.2
