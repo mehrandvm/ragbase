@@ -1,4 +1,3 @@
-# backend/app/core/registry.py
 import json
 import uuid
 from datetime import datetime
@@ -49,9 +48,3 @@ def delete_kb(kb_id: str) -> bool:
     del data[kb_id]
     _write(data)
     return True
-
-
-# Stores KB metadata as a flat JSON file next to the Chroma store.
-# Each KB has an 8-char UUID used as both the registry key and Chroma collection name.
-# No database needed — the registry is the source of truth for names/descriptions,
-# Chroma is the source of truth for vectors.

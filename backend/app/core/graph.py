@@ -1,19 +1,18 @@
-# backend/app/core/graph.py
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import json
 from typing import TypedDict, List, AsyncGenerator
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
-from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
 
 from app.core.vectorstore import get_vectorstore
+from app.core.reranker import rerank
 from app.config import settings
 
 
@@ -28,12 +27,6 @@ class GraphState(TypedDict):
     rewrite_count:           int
 
 
-# ── Grader schema ──────────────────────────────────────────────────────────────
-
-class GradeDoc(BaseModel):
-    relevant: bool = Field(description="True if doc is relevant to the question")
-
-
 # ── Prompts (module-level is fine — no API calls happen here) ──────────────────
 
 CONTEXTUALIZE_PROMPT = ChatPromptTemplate.from_messages([
@@ -42,13 +35,6 @@ CONTEXTUALIZE_PROMPT = ChatPromptTemplate.from_messages([
      "If already standalone, return it as-is. Return ONLY the question."),
     MessagesPlaceholder("chat_history"),
     ("human", "{question}"),
-])
-
-GRADE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system",
-     "Grade whether the document is relevant to the question. "
-     "Be lenient — partial relevance counts."),
-    ("human", "Document:\n{document}\n\nQuestion: {question}"),
 ])
 
 REWRITE_PROMPT = ChatPromptTemplate.from_messages([
@@ -69,7 +55,7 @@ GENERATE_PROMPT = ChatPromptTemplate.from_messages([
 
 # ── Pure helpers (no LLM needed) ───────────────────────────────────────────────
 
-def format_history(chat_history: List[dict]) -> list:
+def chat_history_to_messages(chat_history: List[dict]) -> list:
     out = []
     for msg in chat_history:
         cls = HumanMessage if msg["role"] == "human" else AIMessage
@@ -77,7 +63,7 @@ def format_history(chat_history: List[dict]) -> list:
     return out
 
 
-def format_context(docs: List[Document]) -> str:
+def documents_to_context_block(docs: List[Document]) -> str:
     parts = []
     for doc in docs:
         source = doc.metadata.get("source", "unknown")
@@ -99,16 +85,11 @@ def build_graph(kb_id: str):
         temperature=0,
         api_key=settings.openai_api_key,
     )
-    llm_grader = ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0,
-        api_key=settings.openai_api_key,
-    )
 
     # ── Nodes ────────────────────────────────────────────────────────────────
 
     def contextualize_query(state: GraphState) -> dict:
-        history = format_history(state["chat_history"])
+        history = chat_history_to_messages(state["chat_history"])
         if not history:
             return {"contextualized_question": state["question"]}
         chain  = CONTEXTUALIZE_PROMPT | llm | StrOutputParser()
@@ -121,15 +102,7 @@ def build_graph(kb_id: str):
         return {"documents": docs}
 
     def grade_documents(state: GraphState) -> dict:
-        grader   = GRADE_PROMPT | llm_grader.with_structured_output(GradeDoc)
-        relevant = []
-        for doc in state["documents"]:
-            score = grader.invoke({
-                "document": doc.page_content,
-                "question": state["contextualized_question"],
-            })
-            if score.relevant:
-                relevant.append(doc)
+        relevant = rerank(state["documents"], state["contextualized_question"])
         return {"documents": relevant}
 
     def rewrite_query(state: GraphState) -> dict:
@@ -143,7 +116,7 @@ def build_graph(kb_id: str):
     def generate(state: GraphState) -> dict:
         chain  = GENERATE_PROMPT | llm | StrOutputParser()
         answer = chain.invoke({
-            "context":  format_context(state["documents"]),
+            "context":  documents_to_context_block(state["documents"]),
             "question": state["contextualized_question"],
         })
         return {"generation": answer}
@@ -214,7 +187,10 @@ async def stream_query(kb_id: str, question: str, chat_history: List[dict]) -> A
             event["event"] == "on_chain_end"
             and event["metadata"].get("langgraph_node") == "grade_documents"
         ):
-            final_docs = event["data"]["output"].get("documents", [])
+            output = event["data"].get("output")
+            if isinstance(output, dict):
+                final_docs = output.get("documents", [])
+            # else: ignore (string / other shapes)
 
         # stream tokens from generate node only
         if (
@@ -236,10 +212,3 @@ async def stream_query(kb_id: str, question: str, chat_history: List[dict]) -> A
             for doc in final_docs
         ]
     }
-
-
-# All LLM-dependent nodes are inner functions inside build_graph() — they close over
-# llm and llm_grader which are instantiated at call time, not import time.
-# This means importing graph.py never touches the OpenAI API or reads settings,
-# so startup never fails due to missing keys or network issues.
-# Prompts stay at module level because they're just data structures — no API calls.

@@ -34,9 +34,3 @@ app.add_middleware(
 app.include_router(kb.router)
 app.include_router(ingest.router)
 app.include_router(query.router)
-
-
-# Entry point. Lifespan creates chroma_store/ and uploads/ on first boot so
-# neither the vector store nor the file upload handler need to worry about missing dirs.
-# CORS is locked to the SvelteKit dev port for now — widen allow_origins to ["*"]
-# or your prod domain before deploying.
