@@ -64,8 +64,11 @@ The query pipeline runs as a **LangGraph stateful graph** with corrective RAG â€
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv venv --python 3.12
+
+source .venv/bin/activate
+
+uv pip install -r requirements.txt
 
 cp .env.example .env
 # add your OPENAI_API_KEY to .env

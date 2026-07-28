@@ -1,11 +1,11 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-import json
 from typing import TypedDict, List, AsyncGenerator
 
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -85,6 +85,9 @@ def build_graph(kb_id: str):
         temperature=0,
         api_key=settings.openai_api_key,
     )
+
+    # fully local, zero API cost
+    llm = ChatOllama(model="llama3.2:1b", temperature=0)
 
     # ── Nodes ────────────────────────────────────────────────────────────────
 
